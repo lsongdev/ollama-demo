@@ -63,7 +63,16 @@
         </p>
       </section>
 
-      <section id="app"></section>
+      <section id="app">
+        <h2>Ollama</h2>
+        <textarea name="system" id="system" class="input width-full" placeholder="system message"></textarea>
+        <ul id="messages" class="messages"></ul>
+        <form id="form" class="input-group width-full">
+          <select name="models" id="models" class="select"></select>
+          <input type="text" id="user" autocomplete="off" placeholder="Send a message..." class="input input-block" required>
+          <button type="submit" class="button">Send</button>
+        </form>
+      </section>
 
       <hr />
       <section class="subscribe">

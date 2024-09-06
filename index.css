@@ -13,14 +13,9 @@
 .messages li {
   margin: 5px 0;
   overflow: hidden;
-  background-color: #eee;
   border-radius: 10px;
   padding: 0 15px;
   position: relative;
-}
-
-.message-role-user {
-  text-align: right;
 }
 
 .preview span {
@@ -43,4 +38,17 @@
   color: #666;
   margin-top: 10px;
   font-style: italic;
+}
+
+.message-role-system {
+  background-color: bisque;
+}
+
+.message-role-user {
+  text-align: right;
+  background-color: #eee;
+}
+
+.message-role-assistant {
+  background-color: aliceblue;
 }

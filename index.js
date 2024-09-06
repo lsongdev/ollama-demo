@@ -1,98 +1,93 @@
+// Imports
 import { ready } from 'https://lsong.org/scripts/dom.js';
+import { query } from 'https://lsong.org/scripts/query.js';
 import { parse } from 'https://lsong.org/scripts/marked.js';
-import { h, render, useState, useEffect, useRef } from 'https://lsong.org/scripts/react/index.js';
 import { Ollama } from './ollama.js';
 
-const ollama = new Ollama({
-  host: 'https://ollama.lsong.org',
-});
+// Constants and Initialization
+const { system = '', assistant = '', user = '', model = 'qwen2:latest' } = query;
+const ollama = new Ollama({ host: 'https://ollama.lsong.org' });
+const history = [];
 
-const Message = ({ message }) => {
-  const previewRef = useRef(null);
+// DOM Elements
+let form, systemInput, userInput, messageList, modelsSelect;
 
-  useEffect(() => {
-    if (previewRef.current) {
-      previewRef.current.innerHTML = parse(message.content);
+// Helper Functions
+function createMessageElement(role, content) {
+  const messageElement = document.createElement('li');
+  messageElement.className = `message-role-${role}`;
+  messageElement.innerHTML = parse(content);
+  return messageElement;
+}
+
+async function appendMessage(role, content) {
+  const messageElement = createMessageElement(role, content);
+  messageList.appendChild(messageElement);
+  history.push({ role, content });
+  return messageElement;
+}
+
+async function handleSend() {
+  if (history.length === 0 && systemInput.value) {
+    await appendMessage('system', systemInput.value);
+  }
+  const userContent = userInput.value.trim();
+  await appendMessage('user', userContent);
+  const responseStream = ollama.chat({
+    model: modelsSelect.value,
+    messages: [...history]
+  });
+  const assistantMessage = await appendMessage('assistant', '');
+  for await (const part of responseStream) {
+    if (part.error) {
+      return;
     }
-  }, [message]);
+    const { content } = part.message;
+    assistantMessage.innerHTML = parse(history[history.length - 1].content += content);
+  }
+  userInput.value = '';
+  userInput.focus();
+}
 
-  return h('div', { className: `preview message-role-${message.role}` },
-    h('div', { ref: previewRef, className: 'message-content' })
-  );
-};
+async function initializeChat() {
+  if (model) {
+    const models = await ollama.list();
+    models.forEach(model => {
+      const option = document.createElement('option');
+      option.value = model.model;
+      option.textContent = model.name;
+      modelsSelect.appendChild(option);
+    });
+    modelsSelect.value = model;
+  }
+  if (system) {
+    systemInput.value = system;
+    await appendMessage('system', system);
+  }
+  if (assistant) {
+    await appendMessage('assistant', assistant);
+  }
+  if (user) {
+    userInput.value = user;
+    await handleSend();
+  }
+}
 
-const App = () => {
-  const [models, setModels] = useState([]);
-  const [model, setModel] = useState('qwen2');
-  const [prompt, setPrompt] = useState('');
-  const [messages, setMessages] = useState([]);
+// Main Function
+ready(async () => {
+  // Initialize DOM elements
+  form = document.getElementById('form');
+  systemInput = document.getElementById('system');
+  userInput = document.getElementById('user');
+  messageList = document.getElementById('messages');
+  modelsSelect = document.getElementById('models');
 
-  useEffect(() => {
-    const fetchModels = async () => {
-      const modelsList = await ollama.list();
-      setModels(modelsList);
-      setModel(modelsList[0].model);
-    };
-    fetchModels();
-  }, []);
+  // Set up event listeners
+  form.addEventListener('submit', async e => {
+    e.preventDefault();
+    await handleSend();
+  });
 
-  const sendMessage = async message => {
-    const userMessage = {
-      role: 'user',
-      content: message,
-    };
-    setMessages(prevMessages => [...prevMessages, userMessage]);
-    const responseStream = ollama.chat({ model, messages: [...messages, userMessage] });
-    setMessages(prevMessages => [...prevMessages, {
-      role: 'assistant',
-      content: '',
-    }]);
-    for await (const part of responseStream) {
-      const { role, content } = part.message;
-      setMessages(prevMessages => {
-        const updatedMessages = [...prevMessages];
-        const lastMessage = updatedMessages[updatedMessages.length - 1];
-        updatedMessages[updatedMessages.length - 1] = {
-          role,
-          content: lastMessage.content + content,
-        };
-        return updatedMessages;
-      });
-    }
-  };
-
-  const handleSubmit = async (event) => {
-    event.preventDefault();
-    sendMessage(prompt);
-    setPrompt('');
-  };
-
-  return h('div', null, [
-    h('h2', null, 'Ollama'),
-    h('ul', { className: 'messages' },
-      messages.map((message, index) =>
-        h('li', { className: `message-role-${message.role}`, key: index },
-          h(Message, { message })
-        )
-      )
-    ),
-    h('form', { className: 'flex input-group', onSubmit: handleSubmit }, [
-      h('select', { className: 'select', onChange: e => setModel(e.target.value), value: model },
-        models.map(({ model, name }) => h('option', { value: model }, name))
-      ),
-      h('input', {
-        value: prompt,
-        className: 'input input-block',
-        placeholder: 'Enter something...',
-        onInput: e => setPrompt(e.target.value),
-      }),
-      h('button', { className: 'button button-primary', type: 'submit' }, 'Send'),
-    ]),
-    h('p', { className: 'copyright' }, `Based on Ollama API (${model}).`)
-  ]);
-};
-
-ready(() => {
-  const app = document.getElementById('app');
-  render(h(App), app);
+  // Initialize chat and populate models list
+  await initializeChat();
 });
