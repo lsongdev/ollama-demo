@@ -52,3 +52,7 @@
 .message-role-assistant {
   background-color: aliceblue;
 }
+
+select {
+  width: 100px;
+}
